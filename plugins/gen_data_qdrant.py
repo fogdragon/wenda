@@ -97,22 +97,31 @@ def gen_ids(metadatas):
 
     return ids
 
-
+# 创建一个索引
 def make_index():
     global docs, texts_count
+
+    # 检查设置中是否定义了`settings.librarys.qdrant`的`size`和`overlap`属性。如果有，它将使用这些属性创建一个`CharacterTextSplitter`对象，该对象用于将文本拆分成块。如果没有定义这些属性，它将使用默认值创建`CharacterTextSplitter`对象。
+
     if hasattr(settings.librarys.qdrant, "size") and hasattr(settings.librarys.qdrant, "overlap"):
         text_splitter = CharacterTextSplitter(
             chunk_size=int(settings.librarys.qdrant.size), chunk_overlap=int(settings.librarys.qdrant.overlap), separator='\n')
     else:
         text_splitter = CharacterTextSplitter(
             chunk_size=20, chunk_overlap=0, separator='\n')
+
+    # 使用`text_splitter`对象将`docs`中的文档拆分成块。
     doc_texts = text_splitter.split_documents(docs)
     docs = []
     texts = [d.page_content for d in doc_texts]
     metadatas = [d.metadata for d in doc_texts]
     texts_count += len(texts)
+
+    # 创建一个新的线程，目标是`clac_embedding`函数，并传入`texts`、`embedding`和`metadatas`作为参数
     thread = threading.Thread(target=clac_embedding, args=(texts, embedding, metadatas))
     thread.start()
+
+    # 循环来等待其他正在等待的线程完成。它检查`embedding_lock`对象中正在等待的线程数，如果大于1，就休眠0.1秒。这个循环的目的是确保所有的线程都完成了计算嵌入向量的任务。
     while embedding_lock.get_waiting_threads() > 1:
         time.sleep(0.1)
 
